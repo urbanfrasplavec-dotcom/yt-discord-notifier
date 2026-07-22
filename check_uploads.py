@@ -13,14 +13,12 @@ script only announces videos it hasn't announced before.
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 
 STATE_FILE = "seen.json"
 
-# Map of channel_id -> friendly name (shown in Discord message)
-# Find a channel's ID by going to the channel page -> "Share" -> "Copy channel ID"
-# or view page source and search for "channel_id".
 CHANNELS = {
     "UCkzzNLnuM-VsATWC53ehwOQ": "Wemmbu",
     "UCk2uxbWi5py_iJXaEsh2YRA": "Spoke",
@@ -79,11 +77,21 @@ def notify_discord(video, friendly_name):
     req = urllib.request.Request(
         DISCORD_WEBHOOK_URL,
         data=payload,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (compatible; yt-discord-notifier/1.0)",
+        },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        print(f"Discord response: {resp.status}")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            print(f"Discord response: {resp.status}")
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8", errors="replace")
+        webhook_len = len(DISCORD_WEBHOOK_URL) if DISCORD_WEBHOOK_URL else 0
+        print(f"Discord HTTPError {e.code}: {error_body}")
+        print(f"(Webhook URL length as seen by script: {webhook_len} chars — sanity check this matches your actual webhook URL length)")
+        raise
 
 
 def main():
